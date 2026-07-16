@@ -1,4 +1,6 @@
 .env
+.claude/
+CLAUDE.md
 output/
 __pycache__/
 *.pyc
