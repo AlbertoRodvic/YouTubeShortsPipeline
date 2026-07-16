@@ -1,0 +1,156 @@
+# ---- Voice -----------------------------------------------------------------
+elevenlabs:
+  # Stryka (CgY1SqBRXmX1mlZzsXmR) needs a paid ElevenLabs plan for API use —
+  # swap it back in once the account is upgraded. George is the free-tier stand-in.
+  voice_id: JBFqnCBsd6RMkjVDRZzb    # George - Warm, Captivating Storyteller (premade)
+  model_id: eleven_multilingual_v2
+  output_format: mp3_44100_128
+  voice_settings:                   # matched to the user's dashboard (0-1 scale)
+    stability: 0.6
+    similarity_boost: 0.6
+    style: 0.1
+    use_speaker_boost: true
+    speed: 1.15                     # 1.0 ran 64.9s (>60s Shorts limit) on this script; 1.15 fits
+
+# ---- Visual generation (fal.ai) ---------------------------------------------
+fal:
+  image_model: fal-ai/flux/schnell  # cheapest good image model (~$0.006/image at 2MP)
+  image_input:
+    image_size: { width: 1088, height: 1920 }   # 9:16, dims divisible by 16
+    num_inference_steps: 4
+  video_model: fal-ai/bytedance/seedance/v1/lite/text-to-video
+  video_input:                      # payload sent along with the prompt
+    aspect_ratio: "9:16"
+    resolution: "720p"
+    duration: "5"
+    camera_fixed: false             # want camera movement (dolly/parallax), not a locked-off shot
+  i2v_model: fal-ai/bytedance/seedance/v1/lite/image-to-video
+  i2v_input:                        # animates each still when video.image_motion is "ai"
+    resolution: "720p"
+    duration: "5"                   # 5s clip gently slowed/held to fill the segment; "10" is smoother but 2x cost
+    camera_fixed: false
+  # The user's original negative list can't be sent as a negative_prompt — neither Flux
+  # schnell nor Seedance Lite accepts that field (fal schemas, 2026-07-08). It has been
+  # converted to a POSITIVE stability clause that IS usable now: the still terms are in
+  # video.image_style_suffix below, and the temporal/motion terms are appended to each
+  # `type: video` hook prompt. Original negatives kept here in case we adopt a
+  # negative-prompt-capable model: error, warping, melting, extra/duplicated fruits,
+  # disappearing objects, distorted textures, blurry, low quality, flickering, jittery
+  # movement, unstable camera, unnatural motion, floating objects, deformed shapes,
+  # artifacts, cartoonish, frame inconsistency.
+
+# ---- Video output ------------------------------------------------------------
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  hybrid_hook: true                 # segment 1 becomes a real AI video clip; rest are images + motion
+  target_seconds: [61, 70]          # narration-length guard warns before billing if the estimate misses this
+  image_motion: ai                  # ai = animate every still with the image-to-video model (~$0.18/segment;
+                                    # --sample and --dry-run stay on free Ken Burns); kenburns = free ffmpeg motion
+  # motion prompt for animating stills. CAMERA LANGUAGE ONLY: never mention a
+  # person/photographer/camera-as-object — i2v models render any noun into the
+  # scene (learned 2026-07-15: "a person holding the camera" photobombed 4 clips).
+  i2v_motion_prompt: "handheld camera slowly moves closer and arcs around the subject, the viewing angle gently rotating, subtle natural handheld sway, parallax and depth perspective, smooth realistic filming motion, realistic lighting, consistent composition, high quality"
+  # positive look applied to every Flux still (motion terms live on video-hook prompts only)
+  image_style_suffix: ", vertical 9:16 composition, photorealistic, 4k resolution, ultra-detailed, cinematic realistic lighting, highly detailed, depth perspective, consistent composition, saturated colors, high quality, clean correct rendering, stable clean geometry, solid firm forms, a single subject with a consistent count, well-formed shapes, crisp accurate textures, sharp focus, naturally grounded objects"
+  # camera-motion + human-POV block auto-appended to every `type: video` prompt
+  # (skipped if the prompt already contains "go forward, parallax" — keeps old caches valid)
+  video_style_suffix: ", handheld camera, natural sway from footsteps and breathing, camera slowly arcing and rotating around the subject to change the viewing angle, moving closer, parallax, depth perspective, realistic handheld walking motion, cinematic camera movement, realistic lighting, subtle camera shake, high quality, consistent composition, saturated"
+
+# ---- Captions ------------------------------------------------------------
+captions:
+  enabled: true
+  mode: phrase                      # phrase = full phrase shown, spoken word pops (premium viral style);
+                                    # word = legacy single-word pop
+  phrase_max_words: 4               # words per caption phrase (also breaks at punctuation/pauses)
+  phrase_font_size: 76              # phrase mode font (word mode keeps font_size below)
+  phrase_outline: 7                 # thick black letter border so text stays crisp on bright scenes
+  phrase_width_scale: 0.86          # calibrates measured word widths to the renderer (raise if words overlap)
+  phrase_space_px: 26               # fixed pixel gap between caption words
+  active_color: "FFD400"            # tint of the currently spoken word (unless it has a semantic color)
+  active_scale: 120                 # % size of the currently spoken word
+  accent_scale: 140                 # % size when the spoken word is a curiosity/color accent word
+  words_per_caption: 1              # word mode only: 1 = big single-word pop; 2-3 = calmer
+  uppercase: true
+  font: Arial Black
+  font_size: 105
+  y_center: 1440                    # vertical position of captions (0 = top of 1920 canvas)
+  overlay_font_size: 62             # for the "text on screen" hook lines / fact cards
+  overlay_y: 380
+  overlay_box: true                 # lower-third card: semi-transparent box + slide-in behind overlay text
+  highlight:                        # viral colored word-pop: tint important words per meaning
+    enabled: true
+    keyword_color: "FF9F0A"         # amber accent for curiosity / importance words
+    keywords: [RARE, SECRET, SECRETLY, IMPOSSIBLE, UNKNOWN, NEVER, ONLY, ZERO, MOST,
+               WORLD, WORLDS, WEIRD, WEIRDEST, ALIEN, SHOULDNT, FORBIDDEN, POISON,
+               POISONOUS, DANGEROUS, DEADLY, INSANE, CRAZY, ILLEGAL, BILLION, MILLION,
+               THOUSANDS, FOREVER, IMMORTAL, STRANGE, ULTIMATE, HIDDEN, SECRETLY]
+    word_colors:                    # semantic colors: food color / texture / feeling
+      PINK: "FF69B4"
+      BLUE: "3AA0FF"
+      GOLDEN: "FFD700"
+      GOLD: "FFD700"
+      YELLOW: "FFD400"
+      RED: "FF453A"
+      GREEN: "3BE07A"
+      PURPLE: "B06CFF"
+      ORANGE: "FF9F0A"
+      SPICY: "FF453A"
+      HOT: "FF453A"
+      JUICY: "FFC24B"
+      CREAMY: "FFE9C7"
+      CRUNCHY: "FFC24B"
+      SWEET: "FF8AD4"
+      SOUR: "C8FF3B"
+      FRESH: "3BE07A"
+
+# ---- Thumbnail --------------------------------------------------------------
+# Shorts don't allow custom thumbnail uploads, so a title card is baked into the
+# video where YouTube's frame picker can select it. Also saved as thumbnail.png.
+thumbnail:
+  enabled: true
+  mode: first                       # first = brief flash at 0:00 (keeps the loop seamless); last = card at the end
+  seconds: 0.2                      # how long the card is held (raise if hard to grab in YouTube's frame picker)
+  title_after_seconds: 0            # big title overlay over the hook after the card flash; 0 = off
+                                    # (title lives ONLY on the card at 0:00; the video body shows just captions)
+  font_size: 130
+  uppercase: true
+  y_center_frac: 0.42               # vertical center of the title block (fraction of height)
+
+# ---- Transitions -------------------------------------------------------------
+# Corporate-style xfades between segments (Apple-presentation feel). Segment
+# timing is preserved: each clip's last frame is frozen for the fade duration.
+transitions:
+  enabled: true
+  duration: 0.35                    # seconds per transition
+  types: [fade, smoothleft, zoomin, smoothright, wipeup]   # cycled in order; any ffmpeg xfade name works
+
+# ---- Sound design -----------------------------------------------------------
+# Drop royalty-free files in assets/sfx/: whoosh* plays into every segment
+# change, impact* (or hit*) lands on the hook at 0:00. Empty folder = skipped.
+sfx:
+  enabled: true
+  volume_db: -12
+  whoosh_lead: 0.25                 # start the whoosh this long before the cut so it swells into it
+
+# ---- Music bed -------------------------------------------------------------
+music:
+  enabled: true                     # picks a track from assets/music/ if any exist; skipped otherwise
+  volume_db: -13                    # -22 was inaudible under the voice; ducking still pulls it down during speech
+  duck: true
+
+# ---- Upload metadata (written to output/<slug>/metadata.txt) ----------------
+metadata:
+  hashtags: "#shorts #food #fruit #foodfacts #documentary #rarefruits"
+  attribution: "Narration voice created with ElevenLabs."   # required by the free tier in monetized videos
+
+# ---- Tools -----------------------------------------------------------------
+paths:
+  ffmpeg: ""                        # blank = auto-detect (PATH, then winget install location)
+
+# ---- Price estimates for the cost printout (USD; edit as providers change) --
+prices:
+  image: 0.006
+  video_per_second: 0.036
+  elevenlabs_per_1k_chars: 0.0      # 0 = using subscription credits, not pay-per-char
